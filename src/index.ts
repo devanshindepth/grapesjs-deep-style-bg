@@ -56,6 +56,17 @@ const getLayerFromBgImage = (imagePart: string) => {
       result[PROPERTY_BG_GRAD_TYPE] = gradType;
       result[PROPERTY_BG_GRAD_DIR] = gradDir;
     }
+  } else {
+    const parsed = parseGradient(imagePart);
+    const isCustomAngle = parsed.direction.includes('deg');
+    
+    result[PROPERTY_BG_GRAD_DIR] = isCustomAngle 
+      ? CUSTOM_DIR 
+      : getValidDir(parsed.direction) || GRAD_DIRS[0];
+    
+    if (isCustomAngle) {
+      result[PROPERTY_BG_GRAD_ANGLE] = parsed.direction.replace('deg', '');
+    }
   }
   return result;
 };
@@ -68,9 +79,12 @@ const PROPERTY_BG_COLOR = `${PROPERTY_BG_IMAGE}-color`;
 const PROPERTY_BG_GRAD = `${PROPERTY_BG_IMAGE}-gradient`;
 const PROPERTY_BG_GRAD_DIR = `${PROPERTY_BG_GRAD}-dir`;
 const PROPERTY_BG_GRAD_TYPE = `${PROPERTY_BG_GRAD}-type`;
-
+const PROPERTY_BG_GRAD_ANGLE = `${PROPERTY_BG_GRAD}-angle`;
 
 const DEFAULT_IMAGE = 'none';
+
+const CUSTOM_DIR = 'custom';
+const GRAD_DIRS_EXT = [...GRAD_DIRS, CUSTOM_DIR];
 
 const plugin: Plugin<PluginOptions> = (editor, opts = {}) => {
   const options: PluginOptions = {
@@ -167,7 +181,9 @@ const plugin: Plugin<PluginOptions> = (editor, opts = {}) => {
         const parsed = parseGradient(values[PROPERTY_BG_GRAD] || '');
         image = toGradient(
           values[PROPERTY_BG_GRAD_TYPE] || GRAD_TYPES[0],
-          values[PROPERTY_BG_GRAD_DIR] || GRAD_DIRS[0],
+          values[PROPERTY_BG_GRAD_DIR] === CUSTOM_DIR
+            ? values[PROPERTY_BG_GRAD_ANGLE] 
+            : values[PROPERTY_BG_GRAD_DIR],
           parsed.colors
         );
       }
@@ -244,6 +260,29 @@ const plugin: Plugin<PluginOptions> = (editor, opts = {}) => {
           'center center',
           'center bottom',
         ]),
+      },
+      {
+        name: 'Direction',
+        property: PROPERTY_BG_GRAD_DIR,
+        type: 'select',
+        default: GRAD_DIRS[0],
+        options: getOptions(GRAD_DIRS_EXT),
+        onChange: ({ value, property }: any) => {
+          const angleProp = property.getParent().getProperty(PROPERTY_BG_GRAD_ANGLE);
+          angleProp.up({ visible: value === CUSTOM_DIR });
+        }
+      },
+      {
+        name: 'Angle',
+        property: PROPERTY_BG_GRAD_ANGLE,
+        type: 'number',
+        default: 90,
+        min: 0,
+        max: 360,
+        step: 1,
+        visible: false,
+        // Convert angle to gradient syntax
+        toStyle: (value: string) => value ? `${value}deg` : '',
       },
       {
         property: 'background-attachment',
